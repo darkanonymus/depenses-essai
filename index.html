@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Essai – Appli Dépenses</title>
+
+<!-- Écran d'accueil de l'iPhone : nom sous l'icône, icône, ouverture en plein écran -->
+<meta name="apple-mobile-web-app-title" content="Essai">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0B6B66">
+<link rel="apple-touch-icon" href="icone-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+
+<style>
+/* Couleurs : les mêmes que la maquette, en clair et en sombre */
+:root {
+  --bg: #F2F4F3; --surface: #FFFFFF; --ink: #16201E; --ink-2: #4B5754; --line: #D2D9D6;
+  --accent: #0B6B66; --on-accent: #FFFFFF; --good: #1B7343; --good-soft: #E2F2E8; --warn: #8A5200; --warn-soft: #FBEFD8;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0E1413; --surface: #172120; --ink: #E6EDEB; --ink-2: #A7B4B0; --line: #2D3B38;
+    --accent: #5BC0B6; --on-accent: #052522; --good: #6BCB92; --good-soft: #132C1D; --warn: #E7B45E; --warn-soft: #36290F;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; }
+
+/* En-tête : il tient compte de l'encoche de l'iPhone (safe-area) */
+.entete {
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; min-height: 56px;
+  padding: calc(env(safe-area-inset-top, 0px) + 6px) 16px 6px;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.entete strong { font-size: 18px; }
+.bouton-retour {
+  min-height: 44px; padding: 0 14px 0 10px; border: 1.5px solid var(--accent); border-radius: 12px;
+  background: var(--surface); color: var(--accent); font-weight: 700;
+}
+main { max-width: 440px; margin: 0 auto; padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 32px); }
+.ecran { display: grid; gap: 14px; }
+.carte { display: grid; gap: 10px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.carte h2 { margin: 0; font-size: 18px; }
+.aide { margin: 0; font-size: 15px; color: var(--ink-2); }
+.statut { margin: 0; padding: 10px 12px; border-radius: 10px; font-weight: 700; }
+.statut.oui { background: var(--good-soft); color: var(--good); }
+.statut.non { background: var(--warn-soft); color: var(--warn); }
+.principal, .secondaire {
+  width: 100%; min-height: 52px; border-radius: 14px; padding: 0 16px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; text-align: center;
+}
+.principal { border: 0; background: var(--accent); color: var(--on-accent); }
+.secondaire { border: 1px solid var(--line); background: var(--surface); }
+.secondaire[aria-pressed="true"] { border: 2px solid var(--accent); color: var(--accent); }
+.photo-apercu { width: 100%; max-height: 260px; object-fit: contain; border-radius: 10px; background: var(--bg); }
+.resultat { margin: 0; padding: 12px; border-radius: 10px; background: var(--bg); font: 14px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Écran B : il suit le doigt pendant le geste */
+#ecran-b { min-height: 70vh; align-content: start; background: var(--bg); }
+.bord-gauche { position: fixed; left: 0; top: 30%; width: 6px; height: 40%; border-radius: 0 6px 6px 0; background: var(--accent); opacity: 0.5; }
+.message {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); transform: translateX(-50%);
+  width: max-content; max-width: calc(100% - 32px); padding: 12px 16px; border-radius: 12px;
+  background: var(--ink); color: var(--bg); font-weight: 700; font-size: 15px;
+}
+</style>
+</head>
+<body>
+
+<header class="entete">
+  <button id="bouton-retour" class="bouton-retour" type="button" hidden>‹ Retour</button>
+  <strong id="titre">Essai bloc 1</strong>
+</header>
+
+<main>
+  <!-- Écran A : les trois vérifications et le résultat -->
+  <section id="ecran-a" class="ecran">
+    <div class="carte">
+      <h2>1. Ouverte en plein écran&nbsp;?</h2>
+      <p id="statut-plein-ecran" class="statut"></p>
+    </div>
+
+    <div class="carte">
+      <h2>2. Appareil photo</h2>
+      <p class="aide">Photographie un ticket, comme pour le scanner.</p>
+      <!-- capture="environment" demande l'appareil photo arrière plutôt que la galerie -->
+      <label class="principal" for="photo">Prendre une photo</label>
+      <input id="photo" type="file" accept="image/*" capture="environment" hidden>
+      <img id="photo-apercu" class="photo-apercu" alt="Photo prise" hidden>
+      <p id="photo-infos" class="aide" hidden></p>
+    </div>
+
+    <div class="carte">
+      <h2>3. Glisser pour revenir</h2>
+      <p class="aide">D'abord avec notre geste désactivé, pour voir si l'iPhone le fait seul. Ensuite avec notre geste activé.</p>
+      <button id="bouton-geste" class="secondaire" type="button" aria-pressed="false">Notre geste&nbsp;: désactivé</button>
+      <button id="ouvrir-b" class="principal" type="button">Ouvrir l'écran B</button>
+    </div>
+
+    <div class="carte">
+      <h2>Résultat</h2>
+      <pre id="resultat" class="resultat"></pre>
+      <button id="copier" class="principal" type="button">Copier le résultat</button>
+      <p class="aide">Puis colle-le dans un message pour Emma.</p>
+    </div>
+  </section>
+
+  <!-- Écran B : on y entre, puis on essaie de revenir -->
+  <section id="ecran-b" class="ecran" hidden>
+    <div class="carte">
+      <h2>Écran B</h2>
+      <p id="consigne-b" class="aide"></p>
+      <button id="rien" class="secondaire" type="button">J'ai glissé&nbsp;: rien ne s'est passé</button>
+    </div>
+    <span class="bord-gauche" aria-hidden="true"></span>
+  </section>
+</main>
+
+<div id="message" class="message" role="status" hidden></div>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+/* ---------- 1. Plein écran ? ----------
+   Sur iPhone, navigator.standalone vaut true quand la page est ouverte depuis son icône
+   sur l'écran d'accueil. La deuxième vérification sert aux autres téléphones. */
+const pleinEcran = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+const versionIos = (navigator.userAgent.match(/OS (\d+)_(\d+)/) || []).slice(1).join('.') || 'inconnue';
+const statut = $('statut-plein-ecran');
+statut.className = 'statut ' + (pleinEcran ? 'oui' : 'non');
+statut.textContent = pleinEcran
+  ? 'Oui : la page est ouverte depuis son icône, sans les barres de Safari.'
+  : "Non : la page est ouverte dans Safari. Ajoute-la à l'écran d'accueil, puis ouvre-la depuis l'icône « Essai ».";
+
+/* ---------- 2. Appareil photo ----------
+   L'iPhone donne la photo au champ « photo » ; on lit sa taille en pixels et son poids. */
+let photo = null;
+$('photo').addEventListener('change', (ev) => {
+  const fichier = ev.target.files[0];
+  if (!fichier) return;
+  const adresse = URL.createObjectURL(fichier);
+  const image = $('photo-apercu');
+  image.onload = () => {
+    photo = { largeur: image.naturalWidth, hauteur: image.naturalHeight, poids: fichier.size };
+    $('photo-infos').textContent = 'Photo reçue : ' + textePhoto();
+    $('photo-infos').hidden = false;
+    majResultat();
+  };
+  image.src = adresse;
+  image.hidden = false;
+});
+function textePhoto() {
+  const nombre = (n) => n.toLocaleString('fr-FR');
+  const poids = photo.poids < 1048576
+    ? Math.round(photo.poids / 1024) + ' Ko'
+    : (photo.poids / 1048576).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' Mo';
+  return nombre(photo.largeur) + ' × ' + nombre(photo.hauteur) + ' pixels, ' + poids;
+}
+
+/* ---------- 3. Glisser pour revenir ----------
+   Ouvrir l'écran B ajoute une étape à l'historique (pushState). Revenir, c'est reculer
+   dans l'historique (history.back) ; l'événement « popstate » affiche alors l'écran A.
+   On note qui a demandé le retour : le bouton, notre geste, ou personne de chez nous
+   (dans ce cas, c'est l'iPhone qui a reculé tout seul). */
+let ecran = 'a';
+let notreGeste = false;   // désactivé au départ
+let sourceRetour = null;  // 'bouton' ou 'notre geste'
+const journal = [];       // un élément par essai : { source, notreGeste }
+
+function afficher(quel) {
+  ecran = quel;
+  $('ecran-a').hidden = quel !== 'a';
+  $('ecran-b').hidden = quel !== 'b';
+  $('bouton-retour').hidden = quel !== 'b';
+  $('titre').textContent = quel === 'b' ? 'Écran B' : 'Essai bloc 1';
+  $('ecran-b').style.transition = '';
+  $('ecran-b').style.transform = '';
+  $('rien').hidden = notreGeste;
+  $('consigne-b').textContent = notreGeste
+    ? 'Notre geste est activé. Glisse le doigt depuis le bord gauche de l\'écran vers la droite.'
+    : 'Notre geste est désactivé. Glisse le doigt depuis le bord gauche de l\'écran vers la droite. Si l\'écran revient en arrière, c\'est l\'iPhone qui le fait.';
+  majResultat();
+  window.scrollTo(0, 0);
+}
+function retour(source) {
+  sourceRetour = source;
+  history.back();
+}
+$('ouvrir-b').addEventListener('click', () => {
+  history.pushState({ ecran: 'b' }, '', '#b');
+  afficher('b');
+});
+window.addEventListener('popstate', () => {
+  if (ecran !== 'b') return;
+  journal.push({ source: sourceRetour || 'iPhone', notreGeste });
+  sourceRetour = null;
+  afficher('a');
+});
+$('bouton-retour').addEventListener('click', () => retour('bouton'));
+$('rien').addEventListener('click', () => {
+  journal.push({ source: 'rien', notreGeste });
+  message('Noté. Touche « ‹ Retour » pour revenir.');
+  majResultat();
+});
+$('bouton-geste').addEventListener('click', () => {
+  notreGeste = !notreGeste;
+  $('bouton-geste').setAttribute('aria-pressed', String(notreGeste));
+  $('bouton-geste').textContent = 'Notre geste : ' + (notreGeste ? 'activé' : 'désactivé');
+  majResultat();
+});
+
+/* Notre geste : le doigt part du bord gauche (moins de 24 pixels) et glisse vers la droite.
+   L'écran B suit le doigt ; au-delà d'un tiers de l'écran, ou en glissant vite, on revient. */
+let depart = null;
+document.addEventListener('touchstart', (ev) => {
+  if (!notreGeste || ecran !== 'b' || ev.touches.length !== 1) return;
+  const t = ev.touches[0];
+  if (t.clientX > 24) return;
+  depart = { x: t.clientX, y: t.clientY, temps: Date.now() };
+}, { passive: true });
+document.addEventListener('touchmove', (ev) => {
+  if (!depart) return;
+  const t = ev.touches[0];
+  const dx = t.clientX - depart.x;
+  const dy = Math.abs(t.clientY - depart.y);
+  if (dy > Math.max(dx, 10)) { remettreEnPlace(); return; }  // le doigt monte ou descend : ce n'est pas un retour
+  ev.preventDefault();                                       // pas de défilement pendant le geste
+  $('ecran-b').style.transform = 'translateX(' + Math.max(0, dx) + 'px)';
+}, { passive: false });
+document.addEventListener('touchend', (ev) => {
+  if (!depart) return;
+  const dx = ev.changedTouches[0].clientX - depart.x;
+  const vitesse = dx / Math.max(1, Date.now() - depart.temps);  // pixels par milliseconde
+  depart = null;
+  if (dx > window.innerWidth / 3 || (dx > 40 && vitesse > 0.5)) retour('notre geste');
+  else remettreEnPlace();
+});
+document.addEventListener('touchcancel', () => remettreEnPlace());
+function remettreEnPlace() {
+  depart = null;
+  $('ecran-b').style.transition = 'transform 0.2s ease-out';
+  $('ecran-b').style.transform = '';
+}
+
+/* ---------- Résultat à copier ---------- */
+function texteResultat() {
+  const essai = (f) => journal.some(f);
+  const bouton = essai((j) => j.source === 'bouton') ? 'oui' : 'pas essayé';
+  const iphone = essai((j) => j.source === 'iPhone' && !j.notreGeste) ? 'oui'
+    : essai((j) => j.source === 'rien') ? 'non' : 'pas essayé';
+  const nous = essai((j) => j.source === 'notre geste') ? 'oui' : 'pas essayé';
+  return [
+    'Essai bloc 1 · ' + new Date().toLocaleString('fr-FR'),
+    'Ouverte en plein écran : ' + (pleinEcran ? 'oui' : 'non'),
+    'iOS : ' + versionIos,
+    'Photo : ' + (photo ? textePhoto() : 'pas encore prise'),
+    'Retour par le bouton : ' + bouton,
+    "Geste de l'iPhone seul : " + iphone,
+    'Notre geste : ' + nous,
+    'Navigateur : ' + navigator.userAgent,
+  ].join('\n');
+}
+function majResultat() {
+  $('resultat').textContent = texteResultat();
+}
+$('copier').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(texteResultat());
+    message('Résultat copié.');
+  } catch (e) {
+    message('Copie impossible : appuie longuement sur le texte pour le copier.');
+  }
+});
+
+let minuterie = null;
+function message(texte) {
+  const m = $('message');
+  m.textContent = texte;
+  m.hidden = false;
+  clearTimeout(minuterie);
+  minuterie = setTimeout(() => { m.hidden = true; }, 3000);
+}
+
+// Au démarrage : toujours sur l'écran A, même si l'adresse se termine par #b
+if (location.hash === '#b') history.replaceState(null, '', location.pathname + location.search);
+afficher('a');
+</script>
+</body>
+</html>
